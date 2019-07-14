@@ -3,8 +3,9 @@ package main
 import (
 	"github.com/gorilla/websocket"
 	"net/http"
-	"fmt"
+    "gqm.com/go-websocket/connection"
 )
+
 
 var (
 	upgrader = websocket.Upgrader{
@@ -18,24 +19,33 @@ var (
 func main() {
 	http.HandleFunc("/ws", func(writer http.ResponseWriter, request *http.Request) {
 		var (
-			conn *websocket.Conn
-			date []byte
+			wsConn *websocket.Conn
+			data []byte
 			err  error
+			conn *connection.Connection
 		)
-		if conn, err = upgrader.Upgrade(writer, request, nil); err != nil {
+		if wsConn, err = upgrader.Upgrade(writer, request, nil); err != nil {
+            goto ERR
 			return
 		}
-        conn.WriteMessage(websocket.TextMessage, []byte("连接成功"))
-		for true {
-			if _, date, err = conn.ReadMessage(); err != nil {
-                conn.WriteMessage(websocket.TextMessage, []byte("断开连接"))
-				conn.Close()
-				fmt.Println("断开连接", err)
-				return
-			}
-			fmt.Println(string(date))
-			conn.WriteMessage(websocket.TextMessage, date)
-		}
+
+		if conn,err = connection.InitConnection(wsConn);err != nil{
+		    goto ERR
+		    return
+        }
+		conn.WriteMessage([]byte("connect success"))
+		connection.List = append(connection.List, conn)
+        for{
+            if data,err = conn.ReadMessage();err != nil{
+                goto ERR
+            }
+
+            if err = conn.WriteMessage(data); err!= nil{
+                goto ERR
+            }
+        }
+		ERR:
+		    conn.Close()
 	})
 
 	http.ListenAndServe("0.0.0.0:8080", nil)
